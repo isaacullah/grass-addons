@@ -165,7 +165,7 @@
 # %end
 # %option G_OPT_R_MAP
 # % key: flowcontrib
-# % description: Map or constant indicating how much each cell contributes to downstream flow (this typically relates to vegetation or conservation practices). If no map or value entered, routine will assume 100% downstream contribution (values between 0 and 100 [unitless percentage])
+# % description: Map or constant indicates the percentage of overland flow units leaving each cell. (values between 0 and 100 [unitless percentage])
 # % answer: 100
 # % required : no
 # % guisection: Hydrology
@@ -191,6 +191,11 @@
 # % description: -k Keep ALL temporary maps (overides flags -drst). This will make A LOT of maps!
 # % guisection: Optional
 # %end
+#%flag
+#% key: C
+#% description: -C Calculate a Cumulative Erosion/Deposition map
+#% guisection: Optional
+#%end
 # %flag
 # % key: d
 # % description: -d Don't output yearly soil depth maps
@@ -356,7 +361,7 @@ def landscapeEvol(m, o, p, q, res, s, f):
     aspect = "%saspect%04d" % (p, o)
     flowacc = "%sflowacc%04d" % (p, o)
     flowdir = "%sflowdir%04d" % (p, o)
-    flacclargenum = "%sflowacclargenum%04d" % (p, o)
+#    flacclargenum = "%sflowacclargenum%04d" % (p, o)
     pc = "%spc%04d" % (p, o)
     tc = "%stc%04d" % (p, o)
     qsx = "%sQsx_%04d" % (p, o)
@@ -375,7 +380,7 @@ def landscapeEvol(m, o, p, q, res, s, f):
         aspect,
         flowacc,
         flowdir,
-        flacclargenum,
+#        flacclargenum,
         pc,
         tc,
         rainexcess,
@@ -475,18 +480,18 @@ def landscapeEvol(m, o, p, q, res, s, f):
         flags="a",
         elevation=old_dem,
         threshold=numcells,
-        flow=rainexcess,
-        accumulation=flacclargenum,
+        retention=rainexcess,
+        accumulation=flowacc, #flacclargenum,
         drainage=flowdir,
         convergence=convergence,
     )
 
-    grass.mapcalc(
-        "${flowacc}=${flacclargenum}/100",
-        quiet=True,
-        flowacc=flowacc,
-        flacclargenum=flacclargenum,
-    )
+    # grass.mapcalc(
+        # "${flowacc}=${flacclargenum}/100",
+        # quiet=True,
+        # flowacc=flowacc,
+        # flacclargenum=flacclargenum,
+    # )
 
     # again, do something different if we are only making an evaluation of cutoffs
     if flags["p"] is True:
@@ -913,6 +918,19 @@ def landscapeEvol(m, o, p, q, res, s, f):
         + "Done with Iteration %s " % o
         + "\n*************************\n"
     )
+    if  flags["C"] is True and o == int(options["number"]) :
+        grass.message("Calculating Cumulative Erosion/Deposition Map")
+        cumerdep = "%sCumulative_ED" % (p)
+        grass.mapcalc("${cumerdep}=${finalDEM}-${initDEM}",
+                     quiet = True,
+                     cumerdep = cumerdep,
+                     finalDEM = new_dem,
+                     initDEM = options['elev']
+        )
+        ncc = grass.feed_command("r.colors", quiet=True, map=cumerdep, rules="-")
+        ncc.stdin.write("\n".join(nccolors).encode("utf-8"))
+        ncc.stdin.close()
+        ncc.wait()
     return 0
 
 
